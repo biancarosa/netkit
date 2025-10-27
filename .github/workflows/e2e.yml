@@ -38,7 +38,7 @@ jobs:
       - name: Download Go modules
         run: go mod download
 
-      - name: Build fetchr binary
+      - name: Build netkit binary
         run: make build
 
       - name: Run Go end-to-end tests
