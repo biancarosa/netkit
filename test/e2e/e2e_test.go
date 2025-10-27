@@ -157,13 +157,18 @@ type netkitCmd struct {
 
 // startProxyServer starts the netkit proxy server with the given arguments
 func startProxyServer(t *testing.T, args ...string) *netkitCmd {
-	// Build binary path - we assume the binary is in the root directory
-	binaryPath := filepath.Join("..", "..", "netkit")
+	// Build binary path - we assume the binary is in the bin directory
+	binaryPath := filepath.Join("..", "..", "bin", "netkit")
 
 	// Check if binary exists
 	if _, err := os.Stat(binaryPath); os.IsNotExist(err) {
 		// Try to build it
 		t.Log("Netkit binary not found, building it")
+		// Ensure bin directory exists
+		binDir := filepath.Join("..", "..", "bin")
+		if err := os.MkdirAll(binDir, 0755); err != nil {
+			t.Fatalf("Failed to create bin directory: %v", err)
+		}
 		buildCmd := exec.Command("go", "build", "-o", binaryPath, "../../cmd/netkit")
 		if err := buildCmd.Run(); err != nil {
 			t.Fatalf("Failed to build netkit binary: %v", err)
