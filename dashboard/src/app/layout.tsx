@@ -1,22 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geist = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+const basePath = process.env.NEXT_PUBLIC_NETKIT_BASE_PATH || "";
 
 export const metadata: Metadata = {
   title: "netkit - HTTP Requests Helper",
   description: "A powerful HTTP proxy and request capture tool with a modern web dashboard",
   icons: {
-    icon: "/favicon.ico",
+    icon: `${basePath}/favicon.ico`,
   },
 };
 
@@ -27,9 +18,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geist.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className="antialiased">
         {children}
       </body>
     </html>

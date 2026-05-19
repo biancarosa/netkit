@@ -1,0 +1,9 @@
+.git
+.github
+bin
+coverage*.txt
+dashboard/.next
+dashboard/node_modules
+dashboard/playwright-report
+dashboard/test-results
+internal/dashboard/out

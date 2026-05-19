@@ -13,6 +13,8 @@ import { cn } from '../lib/utils';
 export function Header() {
   const [proxyStatus, setProxyStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const pathname = usePathname();
+  const proxyAddress = apiService.getProxyDisplayAddress();
+  const adminAddress = apiService.getAdminDisplayAddress();
 
   useEffect(() => {
     const checkProxyStatus = async () => {
@@ -117,12 +119,12 @@ export function Header() {
                 <TooltipTrigger asChild>
                   <Badge variant="outline" className="text-xs">
                     <Globe className="h-3 w-3 mr-1" />
-                    localhost:8080
+                    {proxyAddress}
                   </Badge>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>Proxy Server Address</p>
-                  <p className="text-xs text-muted-foreground">Configure your HTTP client to use this proxy</p>
+                  <p className="text-xs text-muted-foreground">Configure your HTTP client to use this proxy when exposed</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -130,7 +132,7 @@ export function Header() {
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Badge variant="outline" className="text-xs bg-blue-50">
-                    Admin: 8081
+                    {adminAddress}
                   </Badge>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -178,4 +180,4 @@ export function Header() {
       </div>
     </header>
   );
-} 
+}

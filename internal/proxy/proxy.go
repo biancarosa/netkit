@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/biancarosa/netkit/internal/dashboard"
@@ -19,13 +20,14 @@ import (
 
 // Config holds the proxy configuration
 type Config struct {
-	Port          int
-	AdminPort     int
-	LogLevel      string
-	HistorySize   int    // Maximum number of requests to keep in history
-	Dashboard     bool   // Enable dashboard serving
-	DashboardPort int    // Port for dashboard (separate from admin port)
-	DashboardDir  string // Directory containing dashboard build files
+	Port              int
+	AdminPort         int
+	LogLevel          string
+	HistorySize       int    // Maximum number of requests to keep in history
+	Dashboard         bool   // Enable dashboard serving
+	DashboardPort     int    // Port for dashboard (separate from admin port)
+	DashboardDir      string // Directory containing dashboard build files
+	DashboardBasePath string // Optional public URL prefix for path-based reverse proxies
 }
 
 // Proxy represents the HTTP proxy server
@@ -81,24 +83,113 @@ func New(config *Config) *Proxy {
 
 	// Initialize the dashboard server if dashboard is enabled
 	if config.Dashboard && config.DashboardPort > 0 {
-		dashboardMux := http.NewServeMux()
+		var dashboardHandler http.Handler
+		dashboardBasePath := normalizeDashboardBasePath(config.DashboardBasePath)
+		dashboardOptions := dashboard.Options{
+			BasePath:     dashboardBasePath,
+			ProxyBaseURL: joinDashboardPath(dashboardBasePath, "/api/proxy"),
+			AdminBaseURL: joinDashboardPath(dashboardBasePath, "/api/admin"),
+		}
 
 		// Serve static files from dashboard directory or embedded dashboard
 		if config.DashboardDir != "" {
-			fileServer := http.FileServer(http.Dir(config.DashboardDir))
-			dashboardMux.Handle("/", fileServer)
+			dashboardHandler = dashboard.DirectoryHandler(config.DashboardDir, dashboardOptions)
 		} else {
 			// Use embedded dashboard
-			dashboardMux.Handle("/", dashboard.Handler())
+			dashboardHandler = dashboard.Handler(dashboardOptions)
 		}
 
 		proxy.dashboardServer = &http.Server{
 			Addr:    fmt.Sprintf(":%d", config.DashboardPort),
-			Handler: dashboardMux,
+			Handler: proxy.dashboardRouter(dashboardHandler),
 		}
 	}
 
 	return proxy
+}
+
+func (p *Proxy) dashboardRouter(staticHandler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		strippedPath := stripDashboardBasePath(r.URL.Path, p.config.DashboardBasePath)
+		routedRequest := cloneRequestWithPath(r, strippedPath)
+
+		switch {
+		case strippedPath == "/api/proxy" || strings.HasPrefix(strippedPath, "/api/proxy/"):
+			p.handleHTTP(w, routedRequest)
+		case strippedPath == "/api/admin/healthz":
+			p.handleHealth(w, routedRequest)
+		case strippedPath == "/api/admin/metrics":
+			p.handleMetrics(w, routedRequest)
+		case strippedPath == "/api/admin/requests":
+			p.handleRequestHistory(w, routedRequest)
+		case strippedPath == "/api/admin/requests/stats":
+			p.handleRequestStats(w, routedRequest)
+		case strippedPath == "/api/admin/requests/clear":
+			p.handleClearHistory(w, routedRequest)
+		default:
+			staticHandler.ServeHTTP(w, routedRequest)
+		}
+	})
+}
+
+func cloneRequestWithPath(r *http.Request, path string) *http.Request {
+	clone := new(http.Request)
+	*clone = *r
+	urlCopy := *r.URL
+	urlCopy.Path = path
+	urlCopy.RawPath = ""
+	clone.URL = &urlCopy
+	return clone
+}
+
+func stripDashboardBasePath(requestPath, basePath string) string {
+	basePath = normalizeDashboardBasePath(basePath)
+	if basePath == "" {
+		return requestPath
+	}
+
+	if requestPath == basePath {
+		return "/"
+	}
+
+	if strings.HasPrefix(requestPath, basePath+"/") {
+		stripped := strings.TrimPrefix(requestPath, basePath)
+		if stripped == "" {
+			return "/"
+		}
+		return stripped
+	}
+
+	return requestPath
+}
+
+func normalizeDashboardBasePath(basePath string) string {
+	basePath = strings.TrimSpace(basePath)
+	if basePath == "" || basePath == "/" {
+		return ""
+	}
+
+	if !strings.HasPrefix(basePath, "/") {
+		basePath = "/" + basePath
+	}
+
+	return strings.TrimRight(basePath, "/")
+}
+
+func joinDashboardPath(basePath, routePath string) string {
+	basePath = normalizeDashboardBasePath(basePath)
+	if routePath == "" || routePath == "/" {
+		if basePath == "" {
+			return "/"
+		}
+		return basePath
+	}
+
+	if !strings.HasPrefix(routePath, "/") {
+		routePath = "/" + routePath
+	}
+
+	return basePath + routePath
 }
 
 // ServeHTTP implements the http.Handler interface for the proxy

@@ -138,6 +138,15 @@ NEXT_PUBLIC_PROXY_PORT=8080
 NEXT_PUBLIC_ADMIN_PORT=8081
 ```
 
+Embedded production dashboards default to same-origin API routes on the dashboard server:
+
+- `/api/proxy` forwards browser requests through the proxy using `X-Netkit-Destination`.
+- `/api/admin/*` mirrors the admin API for health, metrics, history, stats, and clearing history.
+
+For a path-based reverse proxy such as `/netkit`, build the static dashboard with
+`NETKIT_DASHBOARD_BASE_PATH=/netkit` and run `netkit serve --dashboard-base-path /netkit`
+or set the same value in the `NETKIT_DASHBOARD_BASE_PATH` environment variable.
+
 ### Development Setup
 
 ```bash
@@ -349,4 +358,4 @@ netkit cache stats --format json
 
 # Export cache contents
 netkit cache export --output cache-backup.json
-``` 
+```

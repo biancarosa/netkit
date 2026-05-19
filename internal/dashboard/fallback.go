@@ -7,7 +7,7 @@ import (
 )
 
 // Handler returns a fallback handler when dashboard is not embedded
-func Handler() http.Handler {
+func Handler(options ...Options) http.Handler {
 	return &fallbackHandler{}
 }
 

@@ -39,18 +39,20 @@ func runServe() {
 	dashboard := flag.Bool("dashboard", true, "Enable web dashboard")
 	dashboardPort := flag.Int("dashboard-port", 3000, "Dashboard port")
 	dashboardDir := flag.String("dashboard-dir", "", "Directory containing dashboard build files (optional if embedded)")
+	dashboardBasePath := flag.String("dashboard-base-path", envOrDefault("NETKIT_DASHBOARD_BASE_PATH", ""), "Public dashboard URL prefix for path-based reverse proxies")
 	logLevel := flag.String("log-level", "info", "Logging level (debug, info, warn, error)")
 	flag.Parse()
 
 	// Create proxy configuration
 	config := &proxy.Config{
-		Port:          *port,
-		AdminPort:     *adminPort,
-		HistorySize:   *historySize,
-		Dashboard:     *dashboard,
-		DashboardPort: *dashboardPort,
-		DashboardDir:  *dashboardDir,
-		LogLevel:      *logLevel,
+		Port:              *port,
+		AdminPort:         *adminPort,
+		HistorySize:       *historySize,
+		Dashboard:         *dashboard,
+		DashboardPort:     *dashboardPort,
+		DashboardDir:      *dashboardDir,
+		DashboardBasePath: *dashboardBasePath,
+		LogLevel:          *logLevel,
 	}
 
 	// Create and start proxy server
@@ -70,6 +72,7 @@ func runServe() {
 		if config.Dashboard {
 			log.Printf("Dashboard will be available on port %d", config.DashboardPort)
 			log.Printf("Dashboard directory: %s", config.DashboardDir)
+			log.Printf("Dashboard base path: %s", config.DashboardBasePath)
 		}
 	}
 
@@ -94,4 +97,11 @@ func runServe() {
 	if err := proxyServer.Stop(); err != nil {
 		log.Printf("Error stopping proxy server: %v", err)
 	}
+}
+
+func envOrDefault(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
 }
