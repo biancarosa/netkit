@@ -66,7 +66,7 @@ jobs:
 
       - name: Start netkit server for Playwright tests
         run: |
-          ./bin/netkit serve --port 8080 --admin-port 8081 --dashboard-port 3000 &
+          ./bin/netkit serve --port 8080 --admin-port 8081 --dashboard-port 3000 --dashboard-dir dashboard/out &
           echo $! > /tmp/netkit.pid
           # Wait for servers to be ready
           timeout 30 bash -c 'until curl -s http://localhost:8081/healthz > /dev/null; do sleep 1; done'
