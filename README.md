@@ -80,16 +80,29 @@ Flags:
   --port int              Proxy server port (default 8080)
   --admin-port int        Admin server port (enables admin endpoints)
   --history-size int      Maximum requests to keep in history (default 1000)
+  --dashboard             Enable web dashboard (default true)
+  --dashboard-port int    Dashboard server port (default 3000)
+  --dashboard-base-path   Public dashboard URL prefix, for example /netkit
   --log-level string      Log level: debug, info, warn, error (default "info")
 ```
 
 ### Environment Variables
 
-Dashboard configuration (in `dashboard/.env.local`):
+The embedded production dashboard uses same-origin API routes by default:
+`/api/proxy` for proxied requests and `/api/admin/*` for health, history, and metrics.
+
+For standalone dashboard development, you can still point the browser at separate proxy/admin ports in `dashboard/.env.local`:
 ```bash
 NEXT_PUBLIC_PROXY_HOST=localhost
 NEXT_PUBLIC_PROXY_PORT=8080
 NEXT_PUBLIC_ADMIN_PORT=8081
+```
+
+For path-based reverse proxies, build and run with the same base path:
+
+```bash
+docker build --build-arg NETKIT_DASHBOARD_BASE_PATH=/netkit -t netkit .
+docker run -e NETKIT_DASHBOARD_BASE_PATH=/netkit -p 3000:3000 -p 8080:8080 -p 8081:8081 netkit
 ```
 
 ## Usage Examples

@@ -42,17 +42,118 @@ export interface RequestStats {
   methods?: Record<string, number>;
 }
 
+type RuntimeNetkitConfig = {
+  basePath?: string;
+  proxyBaseUrl?: string;
+  adminBaseUrl?: string;
+};
+
+declare global {
+  interface Window {
+    __NETKIT_CONFIG__?: RuntimeNetkitConfig;
+  }
+}
+
+const normalizeBasePath = (value?: string): string => {
+  if (!value || value === '/') {
+    return '';
+  }
+
+  const withLeadingSlash = value.startsWith('/') ? value : `/${value}`;
+  return withLeadingSlash.replace(/\/+$/, '');
+};
+
+const joinUrl = (base: string, path: string): string => {
+  const normalizedBase = base.replace(/\/+$/, '');
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+  return `${normalizedBase}${normalizedPath}`;
+};
+
 class ApiService {
-  private baseUrl: string;
   private proxyHost: string;
   private proxyPort: number;
   private adminPort: number;
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     this.proxyHost = process.env.NEXT_PUBLIC_PROXY_HOST || 'localhost';
     this.proxyPort = parseInt(process.env.NEXT_PUBLIC_PROXY_PORT || '8080');
     this.adminPort = parseInt(process.env.NEXT_PUBLIC_ADMIN_PORT || '8081');
+  }
+
+  private getRuntimeConfig(): RuntimeNetkitConfig {
+    if (typeof window === 'undefined') {
+      return {};
+    }
+
+    return window.__NETKIT_CONFIG__ || {};
+  }
+
+  private getPublicBasePath(): string {
+    return normalizeBasePath(
+      this.getRuntimeConfig().basePath ||
+      process.env.NEXT_PUBLIC_NETKIT_BASE_PATH ||
+      process.env.NEXT_PUBLIC_BASE_PATH
+    );
+  }
+
+  private useLegacyPortUrls(): boolean {
+    return process.env.NODE_ENV === 'development' ||
+      Boolean(
+        process.env.NEXT_PUBLIC_PROXY_HOST ||
+        process.env.NEXT_PUBLIC_PROXY_PORT ||
+        process.env.NEXT_PUBLIC_ADMIN_PORT
+      );
+  }
+
+  private getProxyBaseUrl(): string {
+    const configuredProxyUrl =
+      this.getRuntimeConfig().proxyBaseUrl ||
+      process.env.NEXT_PUBLIC_NETKIT_PROXY_BASE_URL ||
+      process.env.NEXT_PUBLIC_PROXY_BASE_URL;
+
+    if (configuredProxyUrl) {
+      return configuredProxyUrl.replace(/\/+$/, '');
+    }
+
+    if (this.useLegacyPortUrls()) {
+      return `http://${this.proxyHost}:${this.proxyPort}`;
+    }
+
+    return joinUrl(this.getPublicBasePath(), '/api/proxy');
+  }
+
+  private getAdminBaseUrl(): string {
+    const configuredAdminUrl =
+      this.getRuntimeConfig().adminBaseUrl ||
+      process.env.NEXT_PUBLIC_NETKIT_ADMIN_BASE_URL ||
+      process.env.NEXT_PUBLIC_ADMIN_BASE_URL ||
+      process.env.NEXT_PUBLIC_API_URL;
+
+    if (configuredAdminUrl) {
+      return configuredAdminUrl.replace(/\/+$/, '');
+    }
+
+    if (this.useLegacyPortUrls()) {
+      return `http://${this.proxyHost}:${this.adminPort}`;
+    }
+
+    return joinUrl(this.getPublicBasePath(), '/api/admin');
+  }
+
+  getProxyDisplayAddress(): string {
+    if (this.useLegacyPortUrls()) {
+      return `${this.proxyHost}:${this.proxyPort}`;
+    }
+
+    return this.getProxyBaseUrl();
+  }
+
+  getAdminDisplayAddress(): string {
+    if (this.useLegacyPortUrls()) {
+      return `Admin: ${this.adminPort}`;
+    }
+
+    return 'Admin API';
   }
 
   // Add no-cache headers to prevent browser caching
@@ -110,10 +211,8 @@ class ApiService {
       };
 
       // Send request to the proxy server, which will forward it to the destination
-      // specified in the X-Fetchr-Destination header
-      const proxyUrl = `http://${this.proxyHost}:${this.proxyPort}`;
-      
-      const response = await fetch(proxyUrl, fetchOptions);
+      // specified in the X-Netkit-Destination header.
+      const response = await fetch(this.getProxyBaseUrl(), fetchOptions);
       
       const responseBody = await response.text();
       const endTime = Date.now();
@@ -146,7 +245,7 @@ class ApiService {
   // Get request history from the backend
   async getRequestHistory(): Promise<BackendRequestRecord[]> {
     try {
-      const url = this.addCacheBuster(`http://${this.proxyHost}:${this.adminPort}/requests`);
+      const url = this.addCacheBuster(joinUrl(this.getAdminBaseUrl(), '/requests'));
       const response = await fetch(url, {
         method: 'GET',
         headers: this.getDefaultHeaders(),
@@ -166,7 +265,7 @@ class ApiService {
   // Get request statistics from the backend
   async getRequestStats(): Promise<RequestStats | null> {
     try {
-      const url = this.addCacheBuster(`http://${this.proxyHost}:${this.adminPort}/requests/stats`);
+      const url = this.addCacheBuster(joinUrl(this.getAdminBaseUrl(), '/requests/stats'));
       const response = await fetch(url, {
         method: 'GET',
         headers: this.getDefaultHeaders(),
@@ -185,7 +284,7 @@ class ApiService {
   // Clear request history on the backend
   async clearRequestHistory(): Promise<boolean> {
     try {
-      const url = this.addCacheBuster(`http://${this.proxyHost}:${this.adminPort}/requests/clear`);
+      const url = this.addCacheBuster(joinUrl(this.getAdminBaseUrl(), '/requests/clear'));
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -204,7 +303,7 @@ class ApiService {
   // Health check for proxy (now on admin port)
   async checkProxyHealth(): Promise<boolean> {
     try {
-      const url = this.addCacheBuster(`http://${this.proxyHost}:${this.adminPort}/healthz`);
+      const url = this.addCacheBuster(joinUrl(this.getAdminBaseUrl(), '/healthz'));
       const response = await fetch(url, {
         method: 'GET',
         headers: this.getDefaultHeaders(),
@@ -217,4 +316,4 @@ class ApiService {
   }
 }
 
-export const apiService = new ApiService(); 
+export const apiService = new ApiService();

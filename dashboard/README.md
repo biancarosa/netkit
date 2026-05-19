@@ -125,11 +125,14 @@ npm start
 Create a `.env.local` file in the dashboard directory:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:3001
 NEXT_PUBLIC_PROXY_HOST=localhost
 NEXT_PUBLIC_PROXY_PORT=8080
 NEXT_PUBLIC_ADMIN_PORT=8081
 ```
+
+When embedded in the Go binary, the dashboard defaults to same-origin API routes
+instead of browser-visible localhost ports. Use `NEXT_PUBLIC_NETKIT_BASE_PATH`
+at build time when the dashboard is served under a path prefix such as `/netkit`.
 
 ### Proxy Setup
 

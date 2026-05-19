@@ -1,7 +1,7 @@
 .PHONY: build test lint clean coverage release version install check ci help all dev commit-feat commit-fix commit-refactor commit-perf commit-security
 .PHONY: build-dashboard test-dashboard lint-dashboard clean-dashboard install-dashboard install-backend dashboard-dev serve-dev build-all clean-all
 .PHONY: changelog changelog-update changelog-init install-changelog-tools release-patch release-minor release-major release-prerelease release-prerelease-next
-.PHONY: commit-docs commit-style commit-test commit-chore commit-breaking check-conventional-commits test-e2e test-e2e-ui test-e2e-headed
+.PHONY: commit-docs commit-style commit-test commit-chore commit-breaking check-conventional-commits test-e2e test-e2e-ui test-e2e-headed test-docker-dashboard
 
 # Build variables
 BINARY_NAME=netkit
@@ -41,6 +41,7 @@ help:
 	@echo "  test-e2e               - Run Playwright E2E tests (headless)"
 	@echo "  test-e2e-ui            - Run Playwright E2E tests with UI mode (interactive)"
 	@echo "  test-e2e-headed        - Run Playwright E2E tests in headed mode (watch browser)"
+	@echo "  test-docker-dashboard  - Build the Docker image and verify it serves the embedded dashboard"
 	@echo ""
 	@echo "Lint commands:"
 	@echo "  lint                   - Run golangci-lint for Go code"
@@ -253,6 +254,10 @@ test-e2e-headed:
 	fi
 	@echo "🎭 Running Playwright E2E tests in headed mode..."
 	@cd $(DASHBOARD_DIR) && npm run test:e2e:headed
+
+# Build the Docker image and ensure the embedded dashboard is served, not fallback HTML
+test-docker-dashboard:
+	@./scripts/validate-docker-dashboard.sh
 
 # Run end-to-end tests
 e2e:
@@ -731,4 +736,4 @@ release:
 	@$(MAKE) _do_release version=$(version)
 
 # Default target
-all: help 
+all: help
