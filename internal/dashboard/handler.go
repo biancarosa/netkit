@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"io/fs"
+	"log"
 	"net/http"
 	"os"
 	"path"
@@ -71,7 +72,7 @@ func (h *dashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	} else {
 		fileInfo, err := file.Stat()
 		if err == nil && fileInfo.IsDir() {
-			file.Close()
+			closeDashboardFile(file)
 			indexPath := filePath + "/index.html"
 			file, err = h.fs.Open(indexPath)
 			if err != nil {
@@ -86,7 +87,7 @@ func (h *dashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	defer file.Close()
+	defer closeDashboardFile(file)
 
 	setContentType(w, filePath)
 
@@ -105,6 +106,12 @@ func (h *dashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if _, err := w.Write(content); err != nil {
 		return
+	}
+}
+
+func closeDashboardFile(file fs.File) {
+	if err := file.Close(); err != nil {
+		log.Printf("Error closing dashboard file: %v", err)
 	}
 }
 
