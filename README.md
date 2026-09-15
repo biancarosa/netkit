@@ -24,6 +24,19 @@ make dev
 
 Open http://localhost:3000 to access the dashboard.
 
+### Docker dashboard
+
+The published `biancarosa/netkit:0.1.0` image does not embed the dashboard.
+Build the corrected image from this checkout:
+
+```bash
+docker build -t netkit:local .
+docker run --rm -p 127.0.0.1:3000:3000 -p 127.0.0.1:8080:8080 netkit:local
+```
+
+Open http://localhost:3000. The dashboard accesses its admin API through the
+same port. Run `make test-docker-dashboard` to verify the image before publishing.
+
 ## Dashboard Features
 
 ### Request Builder

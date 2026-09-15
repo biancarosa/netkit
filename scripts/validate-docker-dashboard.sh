@@ -65,6 +65,17 @@ if ! grep -q "HTTP Proxy Dashboard" "$tmp_dashboard"; then
   exit 1
 fi
 
+# HTML alone can pass while a prefix mismatch breaks every browser asset.
+asset_path="$(grep -o 'src="[^"]*\.js[^"]*"' "$tmp_dashboard" | head -n 1 | cut -d '"' -f 2)"
+case "$asset_path" in
+  "${api_prefix}/_next/"*) ;;
+  *)
+    echo "Dashboard JavaScript URL does not match ${dashboard_path}: ${asset_path}" >&2
+    exit 1
+    ;;
+esac
+curl -fsS "http://127.0.0.1:${dashboard_port}${asset_path}" > /dev/null
+
 curl -fsS "$health_url" > "$tmp_health"
 if ! grep -q '"healthy"' "$tmp_health"; then
   echo "Dashboard same-origin admin API did not return healthy status" >&2
