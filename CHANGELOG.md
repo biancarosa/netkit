@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-09-15
+
+### 🚀 Features
+- Add e2e testing
+
+
+### 🐛 Bug Fixes
+- Build dockerfile with dashboard embedded
+- String conversion
+- Add proper headers
+- Properly make embedded dashboard work by default
+- Dockerfile
+- Correct binary path in e2e tests to use bin directory
+- Serve built dashboard in e2e workflow
+- Validate Docker dashboards before publishing releases
+
+
+### 📚 Documentation
+- Add codex agent instructions
+
+
+### ⚙️ Miscellaneous Tasks
+- Changelog goodies
+- Fix e2e test workflow by properly building bin on bin_dir
+
+
 ## [0.1.1] - 2025-10-06
 
 ### 🚀 Features
