@@ -58,7 +58,9 @@ FROM alpine:latest
 ARG NETKIT_DASHBOARD_BASE_PATH=""
 ENV NETKIT_DASHBOARD_BASE_PATH=${NETKIT_DASHBOARD_BASE_PATH}
 
-RUN apk --no-cache add ca-certificates
+RUN apk --no-cache add ca-certificates \
+    && addgroup -S -g 10001 netkit \
+    && adduser -S -D -H -u 10001 -G netkit netkit
 
 WORKDIR /app
 
@@ -67,6 +69,8 @@ COPY --from=builder /build/netkit .
 
 # Expose ports (proxy, admin, dashboard)
 EXPOSE 8080 8081 3000
+
+USER 10001:10001
 
 # Run the proxy server with embedded dashboard
 CMD ["./netkit", "serve", "--port", "8080", "--admin-port", "8081", "--dashboard", "--dashboard-port", "3000", "--log-level", "info"]

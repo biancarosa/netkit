@@ -292,3 +292,8 @@ codes are not captured. CONNECT records leave payload sizes at zero (unmeasured)
 and omit request headers to avoid retaining proxy credentials. Transfer errors
 after establishment do not change the setup result. Requests made through the
 dashboard's destination-header API follow its separate HTTP forwarding path.
+
+## Maintainer operations
+
+See [RUNBOOK.md](RUNBOOK.md) for release validation, local troubleshooting,
+CLI/container rollback, and the applicability of cost checks to this distributed tool.
