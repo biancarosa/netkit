@@ -408,7 +408,11 @@ func (p *Proxy) handleConnect(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	defer dest.Close()
+	defer func() {
+		if err := dest.Close(); err != nil {
+			log.Printf("Error closing destination connection: %v", err)
+		}
+	}()
 
 	clientConn, buffered, err := hijacker.Hijack()
 	if err != nil {
@@ -416,7 +420,11 @@ func (p *Proxy) handleConnect(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	defer clientConn.Close()
+	defer func() {
+		if err := clientConn.Close(); err != nil {
+			log.Printf("Error closing client connection: %v", err)
+		}
+	}()
 	if _, err := buffered.WriteString("HTTP/1.1 200 Connection Established\r\n\r\n"); err != nil {
 		recordResult(http.StatusServiceUnavailable, err)
 		return
