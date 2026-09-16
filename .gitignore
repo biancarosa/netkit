@@ -4,6 +4,8 @@ dashboard/test-results
 dashboard/playwrite-report
 bin/
 
+# macOS Finder metadata
+.DS_Store
+
 # Embedded dashboard files (generated during build)
 internal/dashboard/out/
-
