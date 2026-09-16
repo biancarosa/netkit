@@ -42,6 +42,11 @@ docker run -d \
   -p "127.0.0.1:${dashboard_port}:3000" \
   "$image" >/dev/null
 
+if [ "$(docker exec "$container" id -u)" != "10001" ]; then
+  echo "Docker image must run as the non-root netkit user (UID 10001)" >&2
+  exit 1
+fi
+
 for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
   if curl -fsS "$dashboard_url" > "$tmp_dashboard"; then
     break
