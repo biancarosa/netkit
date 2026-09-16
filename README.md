@@ -278,3 +278,17 @@ For each HTTP request through the proxy:
 ## License
 
 MIT License - see LICENSE file for details.
+
+### HTTPS tunnel history
+
+When an application uses Netkit through `HTTPS_PROXY`, history records each
+`CONNECT host:port` tunnel as soon as its setup succeeds or fails. Long-lived
+connections appear immediately. The status and timing describe tunnel setup,
+not the encrypted upstream API response or the lifetime of the connection.
+A reused tunnel can carry multiple HTTPS requests but creates one history entry.
+
+Netkit does not decrypt TLS: HTTPS paths, headers, bodies, and application status
+codes are not captured. CONNECT records leave payload sizes at zero (unmeasured)
+and omit request headers to avoid retaining proxy credentials. Transfer errors
+after establishment do not change the setup result. Requests made through the
+dashboard's destination-header API follow its separate HTTP forwarding path.
