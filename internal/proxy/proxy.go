@@ -374,41 +374,62 @@ func (p *Proxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 
 // handleConnect handles CONNECT method for HTTPS tunneling
 func (p *Proxy) handleConnect(w http.ResponseWriter, r *http.Request) {
-	// This is a simplified CONNECT handler
-	// In a production proxy, you'd implement proper tunneling
-	dest, err := net.Dial("tcp", r.Host)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusServiceUnavailable)
-		return
+	start := time.Now()
+	// CONNECT records describe tunnel establishment, not the encrypted requests
+	// inside it. Record immediately so long-lived tunnels appear in history.
+	record := RequestRecord{
+		ID: generateID(), Timestamp: start, Method: http.MethodConnect,
+		URL: r.Host, ProxyStartTime: start, UpstreamStartTime: start,
+		RequestHeaders: map[string]string{}, ResponseHeaders: map[string]string{},
 	}
-	defer func() {
-		if closeErr := dest.Close(); closeErr != nil {
-			log.Printf("Error closing destination connection: %v", closeErr)
+	recordResult := func(status int, err error) {
+		record.ResponseStatus = status
+		record.Success = err == nil
+		if err != nil {
+			record.Error = err.Error()
 		}
-	}()
-
-	w.WriteHeader(http.StatusOK)
-
+		record.ProxyEndTime = time.Now()
+		if record.UpstreamEndTime.IsZero() {
+			record.UpstreamEndTime = record.ProxyEndTime
+		}
+		p.history.AddRecord(record)
+	}
 	hijacker, ok := w.(http.Hijacker)
 	if !ok {
-		http.Error(w, "Hijacking not supported", http.StatusInternalServerError)
+		err := fmt.Errorf("hijacking not supported")
+		recordResult(http.StatusInternalServerError, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	clientConn, _, err := hijacker.Hijack()
+	dest, err := net.DialTimeout("tcp", r.Host, 30*time.Second)
+	record.UpstreamEndTime = time.Now()
 	if err != nil {
+		recordResult(http.StatusServiceUnavailable, err)
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	defer func() {
-		if closeErr := clientConn.Close(); closeErr != nil {
-			log.Printf("Error closing client connection: %v", closeErr)
-		}
-	}()
+	defer dest.Close()
+
+	clientConn, buffered, err := hijacker.Hijack()
+	if err != nil {
+		recordResult(http.StatusServiceUnavailable, err)
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+	defer clientConn.Close()
+	if _, err := buffered.WriteString("HTTP/1.1 200 Connection Established\r\n\r\n"); err != nil {
+		recordResult(http.StatusServiceUnavailable, err)
+		return
+	}
+	if err := buffered.Flush(); err != nil {
+		recordResult(http.StatusServiceUnavailable, err)
+		return
+	}
+	recordResult(http.StatusOK, nil)
 
 	// Start copying data between client and destination
 	go func() {
-		if _, err := io.Copy(dest, clientConn); err != nil {
+		if _, err := io.Copy(dest, buffered); err != nil {
 			log.Printf("Error copying from client to destination: %v", err)
 		}
 	}()
