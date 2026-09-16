@@ -32,7 +32,9 @@ func TestHTTPSConnectHistory(t *testing.T) {
 	if _, err := io.Copy(io.Discard, resp.Body); err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
 	t.Logf("HTTPS response=%d history records=%d", resp.StatusCode, len(p.history.GetRecords()))
 	records := p.history.GetRecords()
 	if len(records) != 1 {
@@ -56,7 +58,9 @@ func TestHTTPSConnectHistory(t *testing.T) {
 	if _, err := io.Copy(io.Discard, resp2.Body); err != nil {
 		t.Fatal(err)
 	}
-	resp2.Body.Close()
+	if err := resp2.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
 	if len(p.history.GetRecords()) != 1 {
 		t.Fatal("expected one record per tunnel, not per encrypted request")
 	}
@@ -84,7 +88,9 @@ func TestConnectFailureHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
 	if resp.StatusCode != 503 {
 		t.Fatalf("expected 503, got %d", resp.StatusCode)
 	}
