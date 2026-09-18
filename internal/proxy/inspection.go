@@ -94,7 +94,7 @@ func (p *Proxy) handleInspectedConnect(w http.ResponseWriter, r *http.Request) {
 	if err = conn.SetReadDeadline(time.Now().Add(15 * time.Second)); err != nil {
 		return
 	}
-	first, err := rw.Reader.Peek(1)
+	first, err := rw.Peek(1)
 	if err != nil {
 		return
 	}
