@@ -319,7 +319,7 @@ with mode `0600`. Only the public `ca.pem` belongs in client trust stores. The
 private key stays with Netkit. Existing signing CA PEM files can also be loaded;
 an invalid, expired, or mismatched CA fails startup.
 
-For Node.js / OpenClaw, mount the public certificate in the gateway and restart
+For Node.js, make the public certificate available to the application and restart
 its process with:
 
 ```sh
