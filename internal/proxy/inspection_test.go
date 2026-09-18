@@ -225,3 +225,56 @@ func TestInspectionStopClosesIdleTunnels(t *testing.T) {
 	require.NoError(t, p.Stop())
 	require.Eventually(t, func() bool { p.inspectionMu.Lock(); defer p.inspectionMu.Unlock(); return len(p.inspectionConns) == 0 }, time.Second, time.Millisecond)
 }
+
+func TestInspectionLongPolling(t *testing.T) {
+	pollDelay := 100 * time.Millisecond
+	if os.Getenv("NETKIT_LONG_POLL_TEST") == "1" {
+		pollDelay = 31 * time.Second
+	}
+	for _, tc := range []struct {
+		name    string
+		timeout time.Duration
+		status  int
+	}{
+		{"default permits delayed headers", 0, 200},
+		{"explicit deadline is enforced", 20 * time.Millisecond, 502},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				select {
+				case <-time.After(pollDelay):
+					_, err := io.WriteString(w, "poll-result")
+					require.NoError(t, err)
+				case <-r.Context().Done():
+				}
+			}))
+			defer upstream.Close()
+			p, c, _ := inspectionClient(t, upstream)
+			c.Timeout = 40 * time.Second
+			// Check the default separately so a fixed deadline regression cannot pass
+			// merely because this test uses a short simulated polling interval.
+			require.Zero(t, p.inspectionTransport.ResponseHeaderTimeout)
+			p.inspectionTransport.ResponseHeaderTimeout = tc.timeout
+			resp, err := c.Get(upstream.URL + "/poll")
+			require.NoError(t, err)
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
+			require.NoError(t, resp.Body.Close())
+			require.Equal(t, tc.status, resp.StatusCode)
+			record := waitRecords(t, p, 1)[0]
+			if tc.status == 200 {
+				require.Equal(t, "poll-result", string(body))
+				require.Equal(t, "poll-result", record.ResponseBody)
+			} else {
+				require.False(t, record.Success)
+				require.Contains(t, record.Error, "timeout")
+			}
+		})
+	}
+}
+
+func TestInspectionTimeoutConfiguration(t *testing.T) {
+	p := New(&Config{InspectionResponseHeaderTimeout: 90 * time.Second})
+	require.Equal(t, 90*time.Second, p.inspectionTransport.ResponseHeaderTimeout)
+	require.NoError(t, p.Stop())
+}

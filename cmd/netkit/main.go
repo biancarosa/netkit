@@ -48,7 +48,11 @@ func runServe() {
 	inspectHTTPS := flag.Bool("inspect-https", false, "Decrypt and capture HTTPS for all destinations (clients must trust the CA)")
 	caCert := flag.String("ca-cert", "", "Inspection CA certificate PEM file")
 	caKey := flag.String("ca-key", "", "Inspection CA private key PEM file")
+	inspectionTimeout := flag.Duration("inspection-response-header-timeout", 0, "Upstream response-header timeout in inspection mode (0 disables; allow for long polling)")
 	flag.Parse()
+	if *inspectionTimeout < 0 {
+		log.Fatal("--inspection-response-header-timeout must not be negative")
+	}
 	var ca *proxy.CertificateAuthority
 	if *inspectHTTPS {
 		var err error
@@ -62,15 +66,16 @@ func runServe() {
 
 	// Create proxy configuration
 	config := &proxy.Config{
-		InspectionCA:      ca,
-		Port:              *port,
-		AdminPort:         *adminPort,
-		HistorySize:       *historySize,
-		Dashboard:         *dashboard,
-		DashboardPort:     *dashboardPort,
-		DashboardDir:      *dashboardDir,
-		DashboardBasePath: *dashboardBasePath,
-		LogLevel:          *logLevel,
+		InspectionResponseHeaderTimeout: *inspectionTimeout,
+		InspectionCA:                    ca,
+		Port:                            *port,
+		AdminPort:                       *adminPort,
+		HistorySize:                     *historySize,
+		Dashboard:                       *dashboard,
+		DashboardPort:                   *dashboardPort,
+		DashboardDir:                    *dashboardDir,
+		DashboardBasePath:               *dashboardBasePath,
+		LogLevel:                        *logLevel,
 	}
 
 	// Create and start proxy server

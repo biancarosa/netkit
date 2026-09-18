@@ -358,3 +358,9 @@ keep-alive); HTTP/2-only clients are not supported. WebSocket and other protocol
 upgrades return 501 in inspection mode; frame inspection is not implemented.
 Plain HTTP carried inside CONNECT (as used by Node fetch) is also captured.
 Only traffic configured to pass through Netkit can be inspected.
+
+Inspection has no upstream response-header deadline by default, so long-polling
+requests can wait for a response. Client cancellation still cancels the upstream
+request. To impose a deadline, use `--inspection-response-header-timeout=90s`
+with a duration longer than the upstream polling interval. TLS handshake and
+idle-connection timeouts remain in effect.
