@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/biancarosa/netkit/internal/dashboard"
@@ -20,6 +21,7 @@ import (
 
 // Config holds the proxy configuration
 type Config struct {
+	InspectionCA      *CertificateAuthority // Non-nil enables inspection for every CONNECT destination
 	Port              int
 	AdminPort         int
 	LogLevel          string
@@ -32,12 +34,16 @@ type Config struct {
 
 // Proxy represents the HTTP proxy server
 type Proxy struct {
-	config          *Config
-	server          *http.Server
-	adminServer     *http.Server
-	dashboardServer *http.Server
-	httpClient      *http.Client
-	history         *RequestHistory
+	inspectionMu        sync.Mutex
+	inspectionConns     map[net.Conn]struct{}
+	inspectionStopped   bool
+	inspectionTransport *http.Transport
+	config              *Config
+	server              *http.Server
+	adminServer         *http.Server
+	dashboardServer     *http.Server
+	httpClient          *http.Client
+	history             *RequestHistory
 }
 
 // New creates a new Proxy instance
@@ -55,6 +61,11 @@ func New(config *Config) *Proxy {
 		},
 		history: NewRequestHistory(historySize),
 	}
+
+	proxy.inspectionConns = make(map[net.Conn]struct{})
+	proxy.inspectionTransport = http.DefaultTransport.(*http.Transport).Clone()
+	proxy.inspectionTransport.ResponseHeaderTimeout = 30 * time.Second
+	proxy.inspectionTransport.Proxy = nil // Never route upstream connections back into this proxy.
 
 	// Initialize the main HTTP proxy server
 	proxy.server = &http.Server{
@@ -201,7 +212,11 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// For CONNECT method (HTTPS tunneling)
 	if r.Method == http.MethodConnect {
-		p.handleConnect(w, r)
+		if p.config.InspectionCA != nil {
+			p.handleInspectedConnect(w, r)
+		} else {
+			p.handleConnect(w, r)
+		}
 		return
 	}
 
@@ -620,6 +635,14 @@ func (p *Proxy) Start() error {
 func (p *Proxy) Stop() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	p.inspectionMu.Lock()
+	p.inspectionStopped = true
+	for conn := range p.inspectionConns {
+		_ = conn.Close()
+	}
+	p.inspectionMu.Unlock()
+	p.inspectionTransport.CloseIdleConnections()
 
 	var proxyErr, adminErr, dashboardErr error
 
