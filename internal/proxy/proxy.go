@@ -21,15 +21,16 @@ import (
 
 // Config holds the proxy configuration
 type Config struct {
-	InspectionCA      *CertificateAuthority // Non-nil enables inspection for every CONNECT destination
-	Port              int
-	AdminPort         int
-	LogLevel          string
-	HistorySize       int    // Maximum number of requests to keep in history
-	Dashboard         bool   // Enable dashboard serving
-	DashboardPort     int    // Port for dashboard (separate from admin port)
-	DashboardDir      string // Directory containing dashboard build files
-	DashboardBasePath string // Optional public URL prefix for path-based reverse proxies
+	InspectionResponseHeaderTimeout time.Duration         // Zero allows long polling without a proxy header deadline
+	InspectionCA                    *CertificateAuthority // Non-nil enables inspection for every CONNECT destination
+	Port                            int
+	AdminPort                       int
+	LogLevel                        string
+	HistorySize                     int    // Maximum number of requests to keep in history
+	Dashboard                       bool   // Enable dashboard serving
+	DashboardPort                   int    // Port for dashboard (separate from admin port)
+	DashboardDir                    string // Directory containing dashboard build files
+	DashboardBasePath               string // Optional public URL prefix for path-based reverse proxies
 }
 
 // Proxy represents the HTTP proxy server
@@ -64,7 +65,7 @@ func New(config *Config) *Proxy {
 
 	proxy.inspectionConns = make(map[net.Conn]struct{})
 	proxy.inspectionTransport = http.DefaultTransport.(*http.Transport).Clone()
-	proxy.inspectionTransport.ResponseHeaderTimeout = 30 * time.Second
+	proxy.inspectionTransport.ResponseHeaderTimeout = config.InspectionResponseHeaderTimeout
 	proxy.inspectionTransport.Proxy = nil // Never route upstream connections back into this proxy.
 
 	// Initialize the main HTTP proxy server
