@@ -13,13 +13,17 @@ import (
 func main() {
 	// Parse command
 	if len(os.Args) < 2 {
-		log.Fatal("Please specify a command: serve or request")
+		log.Fatal("Please specify a command: serve, request, or ca")
 	}
 
 	command := os.Args[1]
 	os.Args = os.Args[1:] // Remove command from args for flag parsing
 
 	switch command {
+	case "ca":
+		if err := runCA(os.Args[1:]); err != nil {
+			log.Fatal(err)
+		}
 	case "serve":
 		runServe()
 	case "request":
@@ -27,7 +31,7 @@ func main() {
 			log.Fatal(err)
 		}
 	default:
-		log.Fatalf("Unknown command: %s. Use 'serve' or 'request'", command)
+		log.Fatalf("Unknown command: %s. Use 'serve', 'request', or 'ca'", command)
 	}
 }
 
@@ -41,10 +45,24 @@ func runServe() {
 	dashboardDir := flag.String("dashboard-dir", "", "Directory containing dashboard build files (optional if embedded)")
 	dashboardBasePath := flag.String("dashboard-base-path", envOrDefault("NETKIT_DASHBOARD_BASE_PATH", ""), "Public dashboard URL prefix for path-based reverse proxies")
 	logLevel := flag.String("log-level", "info", "Logging level (debug, info, warn, error)")
+	inspectHTTPS := flag.Bool("inspect-https", false, "Decrypt and capture HTTPS for all destinations (clients must trust the CA)")
+	caCert := flag.String("ca-cert", "", "Inspection CA certificate PEM file")
+	caKey := flag.String("ca-key", "", "Inspection CA private key PEM file")
 	flag.Parse()
+	var ca *proxy.CertificateAuthority
+	if *inspectHTTPS {
+		var err error
+		ca, err = proxy.LoadCA(*caCert, *caKey)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else if *caCert != "" || *caKey != "" {
+		log.Fatal("--ca-cert and --ca-key require --inspect-https")
+	}
 
 	// Create proxy configuration
 	config := &proxy.Config{
+		InspectionCA:      ca,
 		Port:              *port,
 		AdminPort:         *adminPort,
 		HistorySize:       *historySize,

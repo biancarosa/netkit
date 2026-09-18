@@ -297,3 +297,64 @@ dashboard's destination-header API follow its separate HTTP forwarding path.
 
 See [RUNBOOK.md](RUNBOOK.md) for release validation, local troubleshooting,
 CLI/container rollback, and the applicability of cost checks to this distributed tool.
+
+### Inspect HTTPS request and response bodies
+
+Netkit can decrypt HTTPS for **every destination** when clients explicitly trust
+its inspection CA. There is no domain allowlist. Without `--inspect-https`, CONNECT
+continues to work as an encrypted tunnel.
+
+Generate a CA once and keep it across proxy restarts:
+
+```sh
+mkdir -p "$HOME/.config/netkit"
+netkit ca --cert "$HOME/.config/netkit/ca.pem" --key "$HOME/.config/netkit/ca-key.pem"
+netkit serve --inspect-https \
+  --ca-cert "$HOME/.config/netkit/ca.pem" \
+  --ca-key "$HOME/.config/netkit/ca-key.pem"
+```
+
+The `ca` command refuses to overwrite existing files and creates the private key
+with mode `0600`. Only the public `ca.pem` belongs in client trust stores. The
+private key stays with Netkit. Existing signing CA PEM files can also be loaded;
+an invalid, expired, or mismatched CA fails startup.
+
+For Node.js / OpenClaw, mount the public certificate in the gateway and restart
+its process with:
+
+```sh
+NODE_EXTRA_CA_CERTS=/path/to/ca.pem \
+NODE_OPTIONS=--use-env-proxy \
+HTTP_PROXY=http://127.0.0.1:8080 \
+HTTPS_PROXY=http://127.0.0.1:8080 \
+node your-app.js
+```
+
+For curl:
+
+```sh
+curl --proxy http://127.0.0.1:8080 --cacert /path/to/ca.pem \
+  https://example.com/
+```
+
+Python requests uses `REQUESTS_CA_BUNDLE=/path/to/ca.pem`; Chromium requires the
+CA in its own applicable trust store and an explicit proxy configuration.
+Certificate-pinned applications need their pinning configuration adjusted.
+Netkit still verifies upstream certificates using its system trust roots; it
+does not disable TLS verification. Private upstream CAs must also be trusted by
+Netkit itself.
+
+The existing request dashboard and `/requests` API show each decrypted HTTP
+exchange, including its full URL, headers, and both bodies. Headers and bodies
+are captured as received, including credentials. Keep access within your trusted
+debugging environment. History remains in memory and is cleared on restart.
+
+Responses are streamed to clients immediately, including SSE; their history
+record is saved when the exchange finishes or disconnects. Long-lived streams
+therefore appear after closing. Capture stores complete bodies in memory, so
+choose `--history-size` to suit payload sizes. Binary or compressed payloads are
+not decoded for display. Inspected connections negotiate HTTP/1.1 (including
+keep-alive); HTTP/2-only clients are not supported. WebSocket and other protocol
+upgrades return 501 in inspection mode; frame inspection is not implemented.
+Plain HTTP carried inside CONNECT (as used by Node fetch) is also captured.
+Only traffic configured to pass through Netkit can be inspected.
